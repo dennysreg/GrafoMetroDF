@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">  
+<script src="scripts/jquery.js"></script>  
+  <script src="scripts/d3.min.js"></script>
+
+    <style>
+    circle {
+        /*stroke:black;
+        stroke-width:1px;
+        fill:MediumSeaGreen;
+        opacity:0.5;*/
+    
+    }
+
+    div{
+        border: solid 1px red;
+        width: 1000px;
+        height: 1000px;
+    }
+.linelabel
+{
+    stroke: none;
+    font-size: 10px;
+    font-weight: bold;
+    font-family: sans-serif;
+}
+    </style>
+</head>
+<body>
+ <button onclick="StartScroll (false)" >+</button>
+    <button onclick="StartScroll (true)" >-</button>
+    <button onclick="ResetZoom()" >Reset</button>
+<div id="chart"></div>
+    <script>
+     var width = 1000,
+         height = 1000;
+
+
+
+
+//var color = d3.scale.category10();
+    var color = d3.scale.ordinal()
+  .domain(["1","2","3","4","5","6","7","8","9","10","11","12"])
+  .range(["#F248A4","#1378C7","#7E9426","#8ACEB5","#FEE011","#E22D27","#F68429","#009A68","#542917","#8A2495","#97A0A7","#AB9848"]);
+
+         function redraw() {
+              console.log("here", d3.event.translate, d3.event.scale);
+              var svg = d3.select('#myScrollArea');
+              svg.attr("transform",
+                  "translate(" + d3.event.translate + ")"
+                  + " scale(" + d3.event.scale + ")");
+            }
+
+var zoom = d3.behavior.zoom().on("zoom", redraw);
+
+function ResetZoom(){
+    zoom.translate([0,0])
+    .scale(1); 
+    var svg = d3.select('#myScrollArea');
+                svg.transition().duration(500).attr('transform', 'translate(' + zoom.translate() + ') scale(' + zoom.scale() + ')');
+}
+function StartScroll(up) {
+
+                
+                 var t = zoom.translate();
+                var s = zoom.scale();
+                var chart = document.getElementById('viz');
+                var w = chart.getAttribute('width')/2.0;
+                var h = chart.getAttribute('height')/2.0;
+
+                 console.log("here", t, s, w, h);
+
+                 var zoomFactor = s + 0.1;
+                if(up)
+                    zoomFactor = s - 0.1;
+                    
+                zoom.scale(zoomFactor);
+                //zoom.translate(t);
+
+                var newx = ((w - (w * zoomFactor))/2.0) ;
+                var newy = ((h - (h * zoomFactor))/2.0) ;
+                zoom.translate([newx,newy]);
+                var svg = d3.select('#myScrollArea');
+                svg.transition().duration(500).attr('transform', 'translate(' + zoom.translate() + ') scale(' + zoom.scale() + ')');
+            }
+
+
+    d3.json('data/graph.json', function(json){
+
+        d3.selection.prototype.moveToFront = function() {
+          return this.each(function(){
+            this.parentNode.appendChild(this);
+          });
+        };
+
+        function add_label(g, x){
+                d3.select(g)
+                    .select("circle")
+                    .transition()
+                    .attr("r",12);                    
+
+                d3.select(g)
+                .append("text")           
+                .attr("dy", "0.35em")     
+                .attr("class","linelabel")                
+                .attr("text-anchor", "middle")
+                .style("fill","white")
+                .style("z-index","9999")
+                .text(function(d) {return x;});
+                
+
+                    console.log('sel:' + parent);
+
+            }
+
+    json.nodes.forEach(function(d,index) {
+       d["id"] = index;    
+    });
+    json.links.forEach(function(d,index){
+        d["id"] = "_"+ d.source + "_" +d.target;
+    });
+
+
+
+       
+            
+            var svg = d3.select('#chart')
+              .append('svg:svg')                
+                .attr('width', width)
+                .attr('height', height)
+                .attr("pointer-events", "all")
+                 .append('svg:g')
+                .call(zoom.on("zoom", redraw))
+                .append('svg:g')
+                .attr('id','myScrollArea');
+
+            svg.append('svg:rect')
+                .attr('width', width)
+                .attr('height', height)
+                .attr('fill', 'white')
+                .attr('id','viz');
+
+   
+            
+
+                
+            var elem = svg.selectAll("g")
+                            .data(json.nodes); 
+
+            var elemEnter = elem.enter()
+                .append("g")
+                .attr("transform", function(d){return "translate("+d.x +"," + d.y + ")";})
+                .attr("id", function(d){return d.id;});
+
+
+             // draw the graph edges
+            var link = svg.selectAll("line.link")
+              .data(json.links)
+              .enter().append("line")                
+                .attr('class', 'link')
+                .style('opacity',0.7)
+                .style('stroke',function (d) { return color(d.linea); })
+                .style('stroke-width', 3)
+                .attr("id", function(d){ return "_"+d.source + "_" + d.target;});
+
+
+            elemEnter
+            .transition()
+                .delay(function(d,i){ return i/ json.nodes.length * 100})
+                .each("end", 
+                    function(d,i){
+                        if(d.terminal == 1){                                    
+                            add_label(this, d.linea);
+                        }
+                });
+            // draw the graph nodes     
+            var circle = 
+                elemEnter
+                .append("circle")
+                .attr("r", 7)
+                .style("opacity", 0.7)
+                .style("fill", function (d) { return color(d.linea); })
+                .attr("id", function(d,i){ return "_"+i;});
+               
+            //draw labels 
+            elemEnter
+                .append("text")
+                .attr("font-size", "10px")
+                .attr("font-family","sans-serif")                
+                .attr("dy", function(d){return 15})
+                .text(function(d) {return d.name});
+            
+
+                circle
+            .on('mouseover', function(d){
+                d3.select(this)
+                    .transition().attr('r', 12)
+            })
+            .on('mouseout', function(d,i){
+                if (d.terminal !== 1) {
+                    d3.select(this).transition().attr('r', 7)
+                }
+            })
+
+            elemEnter.moveToFront();
+            /*var node = svg.selectAll("circle.node")
+              .data(json.nodes)
+              .enter()
+              .append("circle")
+                .attr("class", "node")
+                .attr("r", 7)
+                .attr("cx", function(d) { return d.x;})
+                .attr("cy", function(d) { return d.y;})
+                .style("opacity", 0.7)
+                .style("fill", function (d) { return color(d.linea); });
+            */
+           
+            
+            // create the layout
+            var force = d3.layout.force()
+                .charge(-150)
+                .linkDistance(25)
+                .size([width, height])
+                .nodes(json.nodes)
+                .links(json.links)
+                .start();
+            
+            // define what to do one each tick of the animation
+            force.on("tick", function() {
+                link.attr("x1", function(d) { return d.source.x; })
+                    .attr("y1", function(d) { return d.source.y; })
+                    .attr("x2", function(d) { return d.target.x; })
+                    .attr("y2", function(d) { return d.target.y; });
+                /*
+                node.attr("cx", function(d) { return d.x; })
+                    .attr("cy", function(d) { return d.y; });*/
+                elem.attr("transform", function(d){return "translate("+d.x +"," + d.y + ")";});
+
+                });
+
+            // bind the drag interaction to the nodes
+            elem.call(force.drag);
+            //node.call(force.drag);
+
+
+            circle.on("click", function(d){click(d)}) 
+
+            var cont = 1;
+            var start, end;
+            var enter_duration = 1000;
+
+            function path(next, u, v){
+                var path = [];
+                path.push(v.toString());
+                if (next[u][v] == -1)                
+                    return [];    
+                           
+                while (u != v){
+                    v = next[u][v].toString();              
+                    path.push(v);
+                    
+                }                    
+                return path;
+            }
+
+            var ruta;
+            sortItems = function (a, b) { 
+                //console.log(a);               
+                value_a = ruta.indexOf(a.id.toString());
+                value_b = ruta.indexOf(b.id.toString())
+                //console.log(ruta + "a: " + value_a + ", b: " + value_b);                
+                return value_a - value_b ;
+            };
+            var notSelection;
+            var sel_edges;
+            function cycle(selection, len, times){
+                if(!times) {  
+                    //original sizes
+                    selection
+                    .sort(sortItems)                                
+                    .select("text")
+                        .transition()                                
+                        .duration(function(d,i) { return i/ len * 10;});
+                        
+
+                    //original opacity
+                    notSelection
+                            .select("text")
+                            .transition()
+                            .style("opacity", 1)
+                            .delay(function(d,i) { return i/ len * 10;})
+
+                    sel_edges.style("opacity",1.0);
+
+                     notSelection
+                            .select("circle")
+                            .transition()
+                            .style("opacity", 0.7)
+                            .delay(function(d,i) { return i/ len * 10;})
+
+                    return; 
+                }
+                var n=len;
+
+                //animate circles
+                selection
+                .sort(sortItems)                                
+                .select("circle")
+                    .transition()                                
+                    .delay(function(d,i) { return i/ len * enter_duration;})                    
+                    .style("opacity",1.0)
+                    .attr("r", 15.0)
+                    .each("end",function() 
+                        { 
+                            d3.select(this).       
+                            transition()
+                            .delay(function(d,i) { return i/ len * enter_duration;})
+                            .attr("r",function(d){
+                                if (d.terminal !== 1) {
+                                    return 7;
+                                }else{
+                                    return 12;
+                                }
+                            })
+                            .style("opacity",0.7)
+                            .each("end",function(){
+                                n--;
+                                if(!n){
+                                    cycle(selection,len, times-1);
+                                }
+                            });
+                        });
+                                
+            }
+
+
+
+            
+            function click(d) 
+            {
+                console.log(d); //considering dot has a title attribute
+                
+                if (cont % 2 == 0){
+                    end = d.id;
+
+                    d3.select('circle#_'+end)
+                        .style("opacity",1.0);
+
+
+                    console.log('end: ' + end);
+                    d3.json('data/floyd.json', function(data)
+                    {
+	                    var len = data.dist[start][end];
+	                    console.log('La distancia más corta entre '+json.nodes[start].name+' y '+json.nodes[end].name+' es de ' + len + ' estaciones.');
+	                    ruta = path(data.pred, start, end);
+                        ruta.reverse();                        
+
+                        var selection = svg.selectAll('g')
+                            .filter(function(d){ return ruta.indexOf(d.id.toString()) >- 1;});
+
+
+                        notSelection = svg.selectAll('g')
+                            .filter(function(d){ return ruta.indexOf(d.id.toString()) == - 1;});
+                        //oculta las aristas
+                        //1. genera array de aristas _origen_destino
+                        var aristas = [];
+
+                        for(var i=0; i< len; i++){
+                            var origen = ruta[i]
+                            var destino = ruta[(i+1)];
+                            aristas.push("_"+origen+"_"+destino);
+                            aristas.push("_"+destino+"_"+origen);
+                        }
+                        console.log(ruta);
+                        console.log(aristas);
+                        //console.log('aristas: ' + aristas);
+                        //2. seleccionar las aristas 
+                        
+                        sel_edges = svg.selectAll('line.link')                            
+                            .filter(function(d){ return aristas.indexOf(d.id.toString()) == -1;});
+                        
+                        console.log(sel_edges);
+
+                        sel_edges.style("opacity",0.2);
+
+                        notSelection
+                            .select("text")
+                            .transition()
+                            .style("opacity", 0.2)
+                            .delay(function(d,i) { return i/ len * 10;})
+
+                        notSelection
+                            .select("circle")
+                            .transition()
+                            .style("opacity", 0.2)
+                            .delay(function(d,i) { return i/ len * 10;})
+
+
+
+                        /*selection
+                        .sort(sortItems)                                
+                        .select("text")
+                            .transition()
+                            .delay(function(d,i) { return i/ len * enter_duration;})
+                            .attr("dx", function(d) { return +12; });
+                          */  
+                            
+
+                        cycle(selection,len,3);
+
+                
+
+	                   /*
+	                    	//console.log(json.nodes[ruta[i]].name);
+	                    	var v = ruta[i];
+	                    	var next_v = ruta[(i+1)%ruta.length];
+
+			                d3.select('circle#_' + v)
+		                        .transition()
+		                        .delay(function(d,i) { return i/ len * enter_duration;})
+		                        .style("opacity",1.0)
+		                        .attr("r", 10.0)
+		                        .each("end",function() { 
+		                            d3.select(this).       // so far, as above
+		                                transition()
+		                                .delay(function(d,i) { return i/ len * enter_duration;})
+		                                .attr("r",7)
+		                                .style("opacity",0.7);            // we delete the object instead 
+		                        });
+
+		                    //console.log('line#_' + last_v + "_" + v);
+		                    d3.select('line#_' + v + "_" + next_v)
+		                     .transition()  
+		                     .delay(function(d,i) { return i/ len * enter_duration;})                      
+		                        .style('stroke-width', 4)                        
+		                        .each("end", function(){
+		                        	d3.select(this).
+		                        		transition()
+		                        		.delay(function(d,i) { return i/ len * enter_duration;})
+		                                .style('stroke-width', 2);                        		
+		                        });
+*/
+	                    
+	                });
+                }else{
+                    start = d.id;
+                    d3.select('circle#_'+start)
+                        .style("opacity",1.0);
+                    console.log('start :' + start);
+                }
+
+
+                cont = cont + 1;
+            }
+        });
+    </script>
+</body>
+</html>

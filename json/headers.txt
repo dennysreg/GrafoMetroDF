@@ -1,0 +1,1 @@
+nombre, id, linea, x, y, [id_ady1], [id_ady2], ... , [id_adyn]
